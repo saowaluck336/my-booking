@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8" />
+  <title>INTO THE FOREST | ตารางจองโซน</title>
+  <style>
+    body { font-family: sans-serif; background: #eef5f2; padding: 20px; }
+    nav button { margin-right: 10px; padding: 8px 16px; border: none; background: #235c38; color: #fff; cursor: pointer; }
+    .tab { display: none; margin-top: 20px; }
+    .active { display: block; }
+    input, select, textarea { margin: 5px 0; padding: 5px; display: block; }
+    textarea { width: 300px; height: 80px; }
+    table { border-collapse: collapse; width: 100%; margin-top: 10px; }
+    th, td { border: 1px solid #aaa; padding: 5px; text-align: left; }
+    th { background: #235c38; color: #fff; }
+    .waiting th { background: #f5b5b5; }
+    .waiting td { background: #ffe5e5; }
+    .red { color: red; font-weight: bold; }
+    .action-btn { padding: 4px 8px; margin: 2px; border: none; cursor: pointer; }
+    .edit-btn { background: #4caf50; color: #fff; }
+    .delete-btn { background: #f44336; color: #fff; }
+  </style>
+</head>
+<body>
+  <h1>INTO THE FOREST | ตารางจองโซน</h1>
+  <nav>
+    <button onclick="showTab('booking')">ลงบันทึกการจอง</button>
+    <button onclick="showTab('waiting')">รอใช้บริการ</button>
+    <button onclick="showTab('used')">ใช้บริการแล้ว</button>
+    <button onclick="showTab('summary')">สรุปการจองทั้งหมด</button>
+  </nav>
+
+  <section id="booking" class="tab">
+    <h2>ลงบันทึกการจอง</h2>
+    <label>ปี: <select id="yearSelect"></select></label>
+    <label>เดือน: <select id="monthSelect"></select></label>
+    <div id="bookingForm">
+      <input type="hidden" id="editIndex">
+      <input type="date" id="bookDate">
+      <input type="text" id="customerName" placeholder="ชื่อผู้จอง">
+      <input type="text" id="company" placeholder="บริษัท/คณะ">
+      <input type="number" id="quantity" placeholder="จำนวน">
+      <input type="text" id="zone" placeholder="โซน">
+      <input type="number" id="deposit" placeholder="มัดจำแล้ว">
+      <label><input type="checkbox" id="statusWaiting"> รอใช้บริการ</label>
+      <input type="text" id="phone" placeholder="เบอร์ติดต่อ">
+      <textarea id="note" placeholder="หมายเหตุ"></textarea>
+      <button onclick="saveBooking()">💾 บันทึกการจอง</button>
+    </div>
+  </section>
+
+  <section id="waiting" class="tab">
+    <h2>รอใช้บริการ</h2>
+    <table class="waiting">
+      <thead><tr>
+        <th>วันที่จอง</th><th>ชื่อ</th><th>บริษัท</th><th>จำนวน</th><th>โซน</th><th>มัดจำ</th><th>โทร</th><th>หมายเหตุ</th><th>ใช้แล้ว</th>
+      </tr></thead>
+      <tbody id="waitingList"></tbody>
+    </table>
+  </section>
+
+  <section id="used" class="tab">
+    <h2>ใช้บริการแล้ว</h2>
+    <table>
+      <thead><tr>
+        <th>วันที่จอง</th><th>ชื่อ</th><th>บริษัท</th><th>จำนวน</th><th>โซน</th><th>มัดจำ</th><th>โทร</th><th>หมายเหตุ</th>
+      </tr></thead>
+      <tbody id="usedList"></tbody>
+    </table>
+  </section>
+
+  <section id="summary" class="tab">
+    <h2>สรุปการจองทั้งหมด</h2>
+    <label>ปี: <select id="summaryYear"></select></label>
+    <label>เดือน: <select id="summaryMonth"><option value="">ทั้งหมด</option></select></label>
+    <button onclick="renderSummary()">ดูสรุป</button>
+    <button onclick="summarizeCompanies()">สรุปบริษัทซ้ำ</button>
+    <table>
+      <thead><tr>
+        <th>วันที่</th><th>ชื่อ</th><th>บริษัท</th><th>จำนวน</th><th>โซน</th>
+        <th>มัดจำ</th><th>สถานะ</th><th>โทร</th><th>หมายเหตุ</th><th>จัดการ</th>
+      </tr></thead>
+      <tbody id="summaryList"></tbody>
+    </table>
+    <h3>บริษัทที่จองซ้ำ</h3>
+    <table><thead><tr><th>บริษัท</th><th>จำนวนครั้ง</th></tr></thead><tbody id="companySummary"></tbody></table>
+  </section>
+
+  <script>
+    const ys = document.getElementById('yearSelect'), ms = document.getElementById('monthSelect');
+    const sy = document.getElementById('summaryYear'), sm = document.getElementById('summaryMonth');
+    const thisY = new Date().getFullYear();
+    for (let y=thisY-2; y<=thisY+1; y++){
+      ys.append(new Option(y,y)); sy.append(new Option(y,y));
+    }
+    ys.value = sy.value = thisY;
+    ['มกราคม','กุมภาพันธ์','มีนาคม','เมษายน','พฤษภาคม','มิถุนายน',
+     'กรกฎาคม','สิงหาคม','กันยายน','ตุลาคม','พฤศจิกายน','ธันวาคม']
+     .forEach((m,i)=>{
+       ms.append(new Option(m,i+1));
+       sm.append(new Option(m,i+1));
+   });
+    ms.value = new Date().getMonth()+1;
+
+    function showTab(id){
+      document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+      document.getElementById(id).classList.add('active');
+      if(id==='waiting') refreshLists();
+      if(id==='used') refreshLists();
+      if(id==='summary') renderSummary();
+    }
+
+    function saveBooking(){
+      const idx=document.getElementById('editIndex').value;
+      const b={
+        date:document.getElementById('bookDate').value,
+        name:document.getElementById('customerName').value,
+        company:document.getElementById('company').value,
+        quantity:document.getElementById('quantity').value,
+        zone:document.getElementById('zone').value,
+        deposit:document.getElementById('deposit').value,
+        phone:document.getElementById('phone').value,
+        note:document.getElementById('note').value,
+        status:document.getElementById('statusWaiting').checked?'waiting':'used',
+        month:ms.value, year:ys.value
+      };
+      if(!b.date||!b.name||b.status==='') { alert('กรอกข้อมูลให้ครบ'); return; }
+      let bs=JSON.parse(localStorage.getItem('bookings')||'[]');
+      if(idx) bs[idx]=b; else bs.push(b);
+      localStorage.setItem('bookings', JSON.stringify(bs));
+      alert('บันทึกเรียบร้อย!');
+      document.getElementById('bookingForm').reset();
+      document.getElementById('editIndex').value='';
+      refreshLists();
+    }
+
+    function refreshLists(){
+      let bs=JSON.parse(localStorage.getItem('bookings')||'[]');
+      const wtb=document.getElementById('waitingList'), ued=document.getElementById('usedList');
+      wtb.innerHTML=''; ued.innerHTML='';
+      bs.forEach((b,i)=>{
+        const dp=b.date.split('-').reverse().join('/');
+        const redCls=(new Date(b.date)-new Date())/(1000*3600*24)<=3?'red':'';
+        const row=`<tr>
+            <td class="${redCls}">${dp}</td><td>${b.name}</td><td>${b.company}</td>
+            <td>${b.quantity}</td><td>${b.zone}</td><td>${b.deposit}</td>
+            <td>${b.phone}</td><td>${b.note}</td>
+            ${b.status==='waiting'?`<td><input type="checkbox" onchange="markUsed(${i})"></td>`:''}
+            </tr>`;
+        if(b.status==='waiting') wtb.innerHTML+=row;
+        else ued.innerHTML+=row;
+      });
+      renderSummary(); // ส่งข้อมูลไปหน้า summary
+    }
+
+    function markUsed(i){
+      let bs=JSON.parse(localStorage.getItem('bookings')||'[]');
+      bs[i].status='used';
+      localStorage.setItem('bookings', JSON.stringify(bs));
+      refreshLists();
+    }
+
+    function editBooking(i){
+      const b=JSON.parse(localStorage.getItem('bookings'))[i];
+      document.getElementById('editIndex').value=i;
+      document.getElementById('bookDate').value=b.date;
+      document.getElementById('customerName').value=b.name;
+      document.getElementById('company').value=b.company;
+      document.getElementById('quantity').value=b.quantity;
+      document.getElementById('zone').value=b.zone;
+      document.getElementById('deposit').value=b.deposit;
+      document.getElementById('phone').value=b.phone;
+      document.getElementById('note').value=b.note;
+      document.getElementById('statusWaiting').checked=b.status==='waiting';
+      ys.value=b.year; ms.value=b.month;
+      showTab('booking');
+    }
+
+    function deleteBooking(i){
+      const bs=JSON.parse(localStorage.getItem('bookings')||'[]');
+      bs.splice(i,1);
+      localStorage.setItem('bookings', JSON.stringify(bs));
+      refreshLists();
+    }
+
+    function renderSummary(){
+      const syv=sy.value, smv=sm.value;
+      const tb=document.getElementById('summaryList');
+      tb.innerHTML='';
+      const bs=JSON.parse(localStorage.getItem('bookings')||'[]')
+        .filter(b=>b.year===syv && (!smv||b.month===smv))
+        .sort((a,b)=>new Date(a.date)-new Date(b.date));
+      bs.forEach((b,i)=>{
+        const dp=b.date.split('-').reverse().join('/');
+        const redCls=(new Date(b.date)-new Date())/(1000*3600*24)<=3?'red':'';
+        const st=b.status==='waiting'?`<td class="red">${b.status}</td>`:`<td>${b.status}</td>`;
+        tb.innerHTML+=`<tr>
+          <td class="${redCls}">${dp}</td><td>${b.name}</td><td>${b.company}</td><td>${b.quantity}</td>
+          <td>${b.zone}</td><td>${b.deposit}</td>${st}<td>${b.phone}</td><td>${b.note}</td>
+          <td><button class="action-btn edit-btn" onclick="editBooking(${i})">แก้ไข</button>
+              <button class="action-btn delete-btn" onclick="deleteBooking(${i})">ลบ</button></td>
+        </tr>`;
+      });
+    }
+
+    function summarizeCompanies(){
+      const cs=document.getElementById('companySummary');
+      cs.innerHTML='';
+      const cnt={};
+      JSON.parse(localStorage.getItem('bookings')||'[]').forEach(b=>{
+        if(b.company) cnt[b.company]=1+(cnt[b.company]||0);
+      });
+      for(const [c,n] of Object.entries(cnt)){
+        if(n>1) cs.innerHTML+=`<tr><td>${c}</td><td>${n}</td></tr>`;
+      }
+    }
+
+    showTab('booking');
+    refreshLists();
+  </script>
+</body>
+</html>
